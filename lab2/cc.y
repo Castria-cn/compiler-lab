@@ -89,17 +89,18 @@ ExtDef: Specifier ExtDecList SEMI {
         ptr1 = ptr1->next;
         ptr2 = ptr2->next;
         ptr3 = ptr3->next;
-        print_shape(ptr3->value);
         if (insert_arg(table, fun_name, find_struct_by_name(struct_table, ptr1->value), ptr2->value, ptr3->value) == 0) {
             report_error("Argument redeclaration", @1.first_line, "3");
         }
         else {
+            fun_calling = get_item_by_name(table, fun_name);
             if (has_tag(struct_table, ptr2->value) || has_item(table, ptr2->value)) report_error("Variable name \"%s\" already used", @1.first_line, "3", ptr2->value);
             else insert_var(table, ptr2->value, find_struct_by_name(struct_table, ptr1->value), ptr3->value);
         }
     }
     type_list = new_list();
     name_list = new_list();
+    shapes = new_list();
 } CompSt { }
 | Specifier error SEMI { report_error("ExtDef error; Sync with SEMI", @3.first_line, "B"); }
 | Specifier error { report_error("ExtDef error; Missing ';'?", @2.first_line, "B"); };
@@ -192,7 +193,9 @@ Def: Specifier DecList SEMI {
         }
         else {
             if (has_tag(struct_table, ptr->value) || has_item(table, ptr->value)) report_error("Variable name \"%s\" already used", @1.first_line, "3", ptr->value);
-            else insert_var(table, ptr->value, find_struct_by_name(struct_table, type), ptr2->value);
+            else {
+                insert_var(table, ptr->value, find_struct_by_name(struct_table, type), ptr2->value);
+            }
         }
     }
     name_list = new_list();
@@ -320,7 +323,7 @@ Exp: Exp ASSIGNOP Exp {
     }
     $$.assignable = 0;
 }
-| ID LP { if (has_item(table, $1) == 0) {report_error("Function \"%s\" undeclared", @1.first_line, "2", $1); matching_arg = NULL;} else { arg_mismatched = 0; fun_calling = get_item_by_name(table, $1); matching_arg = fun_calling->data.fun_info->head->next;}} Args RP {
+| ID LP { if (has_item(table, $1) == 0) {report_error("Function \"%s\" undeclared", @1.first_line, "2", $1); matching_arg = NULL;} else { arg_mismatched = 0; fun_calling = get_item_by_name(table, $1); matching_arg = fun_calling->data.fun_info->head->next; }} Args RP {
     if (has_item(table, $1) == 0) report_error("Function undeclared", @1.first_line, "2");
     else if (get_item_by_name(table, $1)->type != FUN) report_error("Calling a non-function identifier", @1.first_line, "11");
     else if (matching_arg != NULL) report_error("Argument number mismatch", @1.first_line, "9");
@@ -335,7 +338,6 @@ Exp: Exp ASSIGNOP Exp {
     else if (get_item_by_name(table, $1)->type != FUN) report_error("Calling a non-function identifier", @1.first_line, "11");
     else if (fun_calling->data.fun_info->head->value) report_error("Argument number mismatch", @1.first_line, "9");
     else {
-        
         $$.type = fun_calling->data.fun_info->ret_vtype;
         $$.dim = 0;
     }
@@ -353,7 +355,7 @@ Exp: Exp ASSIGNOP Exp {
     else if (!has_field($1.type, $3)) report_error("Undeclared struct field", @1.first_line, "14");
     else {
     	struct field_info *field = get_field_by_name(struct_ptr, $3);
-    	if (field == NULL) { printf("!!\n"); $$.type = INT_TYPE; /* set to INT_TYPE */ $$.dim = 0; $$.assignable = 0;}
+    	if (field == NULL) { $$.type = INT_TYPE; /* set to INT_TYPE */ $$.dim = 0; $$.assignable = 0;}
     	else {
     	    $$.type = field->type;
     	    $$.dim = field->shape->value;
@@ -361,7 +363,7 @@ Exp: Exp ASSIGNOP Exp {
     	}
     }
 }
-| ID { 
+| ID {
     if (has_item(table, $1) == 0) { report_error("Variable \"%s\" undeclared", @1.first_line, "1", $1);  $$.type = INT_TYPE; }
     else {
         struct table_item *item = get_item_by_name(table, $1);
@@ -371,7 +373,7 @@ Exp: Exp ASSIGNOP Exp {
         }
         else {
             $$.type = item->data.var_info.vtype;
-            $$.dim = item->data.var_info.shape->value;
+            $$.dim = (item->data.var_info.shape)->value;
         }
     }
     $$.assignable = 1;
@@ -379,16 +381,18 @@ Exp: Exp ASSIGNOP Exp {
 | INT { $$.type = INT_TYPE; $$.dim = 0; $$.assignable = 0; }
 | FLOAT { $$.type = FLOAT_TYPE; $$.dim = 0; $$.assignable = 0; };
 
-Args: Exp COMMA Args {
+Args: Exp {
     if (matching_arg == NULL) { if (!arg_mismatched) report_error("Argument number mismatch", @1.first_line, "9"); arg_mismatched = 1; }
-    else if (((struct arg_info*)(matching_arg->value))->arg_vtype != $1.type) { if (!arg_mismatched) report_error("Argument type mismatch", @1.first_line, "9"); arg_mismatched = 1; matching_arg = matching_arg->next; }
+    else if (((struct arg_info*)(matching_arg->value))->arg_vtype != $1.type || ((struct arg_info*)(matching_arg->value))->shape->value != $1.dim) {
+        if (!arg_mismatched) report_error("Argument type mismatch", @1.first_line, "9"); arg_mismatched = 1; matching_arg = matching_arg->next;
+    }
     else {
         matching_arg = matching_arg->next;
     }
-}
+}COMMA Args {}
 | Exp {
-   if (matching_arg == NULL && !arg_mismatched) { if (!arg_mismatched) report_error("Argument number mismatch", @1.first_line, "9"); arg_mismatched = 1; }
-   else if (((struct arg_info*)(matching_arg->value))->arg_vtype != $1.type) { if (!arg_mismatched) report_error("Argument type mismatch", @1.first_line, "9"); arg_mismatched = 1; matching_arg = matching_arg->next; }
+   if (matching_arg == NULL) { if (!arg_mismatched) report_error("Argument number mismatch", @1.first_line, "9"); arg_mismatched = 1; }
+   else if (((struct arg_info*)(matching_arg->value))->arg_vtype != $1.type || ((struct arg_info*)(matching_arg->value))->shape->value != $1.dim) { if (!arg_mismatched) report_error("Argument type mismatch", @1.first_line, "9"); arg_mismatched = 1; matching_arg = matching_arg->next; }
    else {
        matching_arg = matching_arg->next;
    }
