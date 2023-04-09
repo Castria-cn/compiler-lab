@@ -103,7 +103,7 @@ struct struct_info *insert_struct(struct listnode *T, char *opt_name);
 int insert_field(struct struct_info *struct_info, char *field_name, struct struct_info *type, struct listnode *shape);
 
 /**
- * To check if there is a variable called s in symbol table T.
+ * Check if there is a variable called s in symbol table T.
  * Returns 1 if s already exists else 0.
 */
 int has_item(struct listnode *T, char *s);
@@ -133,3 +133,9 @@ struct struct_info *get_type_by_name(struct listnode *table, char *s);
 struct table_item *get_item_by_name(struct listnode *table, char *s);
 
 struct field_info *get_field_by_name(struct struct_info *struct_info, char *s);
+
+/*
+ * Check if there is a tag s in struct table T.
+ * Returns 1 if already exists else 0.
+ */
+int has_tag(struct listnode *struct_table, char *s);

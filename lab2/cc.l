@@ -77,7 +77,7 @@ while    while
 {or}     { return OR; } /* OR */
 {semi}   { return SEMI; } /* SEMI */
 {assign} { return ASSIGNOP; } /* ASSIGNOP */
-{relop}  { return RELOP; } /* RELOP */
+{relop}  { yylval.id = malloc(strlen(yytext)); strcpy(yylval.type, yytext); return RELOP; } /* RELOP */
 {id}     { yylval.id = malloc(strlen(yytext)); strcpy(yylval.id, yytext); return ID; } /* ID */
 {wid}    { printf("Error type A at Line %d: wrong id \"%s\".\n", yylineno, yytext); f2p = 1; return ID;}
 .        { printf("Error type A at Line %d: unknown character \"%s\".\n", yylineno, yytext); f2p = 1; }

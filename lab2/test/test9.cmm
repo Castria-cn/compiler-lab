@@ -1,0 +1,8 @@
+int f(int a, int b) {}
+
+int main() {
+    float x;
+    f();
+    f(1, 2);
+    f(x, 2);
+}

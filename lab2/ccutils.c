@@ -8,14 +8,22 @@
 #include <string.h>
 #include <limits.h>
 
+int last_report = 0;
 #define BUFFER_SIZE (1024)
 
 void yyerror(char *s, ...) {
 }
 
-void report_error(char *s, int lineno, char *type) {
+void report_error(char *s, int lineno, char *type, ...) {
     if (strcmp(type, "B") == 0) f2p = 1;
-    printf("Error type %s at Line %d: %s.\n", type, lineno, s);
+    if (lineno == last_report) return;
+    printf("Error type %s at Line %d: ", type, lineno);
+    va_list args;
+    va_start(args, s);
+    vprintf(s, args);
+    va_end(args);
+    printf(".\n");
+    last_report = lineno;
 }
 
 int main(int argc, char **argv) {
@@ -32,6 +40,7 @@ int main(int argc, char **argv) {
     FILE *output = popen(test_dir, "r");
     while (fgets(buffer, sizeof(buffer), output) != NULL) {
         f2p = 0;
+        last_report = 0;
         
         // memory leak!
         table = new_list();
@@ -47,6 +56,7 @@ int main(int argc, char **argv) {
         FILE *f = fopen(path, "r");
         yyrestart(f);
         yyparse();
+        // printf("parse finish.\n");
         if (!f2p) {
             print_table(table);
         }

@@ -48,6 +48,7 @@ else the symbol is non-terminal, represented as AST
 
 %type <content> Program ExtDefList ExtDef ExtDecList Specifier StructSpecifier OptTag Tag VarDec FunDec VarList ParamDec CompSt StmtList Stmt DefList Def DecList Dec Args
 %type <exp> Exp
+%type <id> RELOP
 %%
 Program: {shape_list = new_list(); }ExtDefList {
 };
@@ -65,15 +66,21 @@ ExtDef: Specifier ExtDecList SEMI {
             report_error("Undeclared struct", @1.first_line, "17");
             continue;
         }
-        if (using_struct) insert_var(table, ptr->value, struct_ptr, ptr2->value);
-        else insert_var(table, ptr->value, find_struct_by_name(struct_table, type), ptr2->value);
+        if (using_struct) {
+            if (has_tag(struct_table, ptr->value) || has_item(table, ptr->value)) report_error("Variable name \"%s\" already used", @1.first_line, "3", ptr->value);
+            else insert_var(table, ptr->value, struct_ptr, ptr2->value);
+        }
+        else {
+            if (has_tag(struct_table, ptr->value) || has_item(table, ptr->value)) report_error("Variable name \"%s\" already used", @1.first_line, "3", ptr->value);
+            else insert_var(table, ptr->value, find_struct_by_name(struct_table, type), ptr2->value);
+        }
     }
     using_struct = 0;
     name_list = new_list();
 }
 | Specifier SEMI {}
-| Specifier FunDec { struct_ptr = find_struct_by_name(struct_table, $1); } CompSt {
-    if (insert_fun(table, fun_name, find_struct_by_name(struct_table, $1)) == 0) {
+| Specifier FunDec { 
+    if (insert_fun(table, fun_name, struct_ptr) == 0) {
         report_error("Function redeclaration", @1.first_line, "4");
     }
     if (type_list == NULL) type_list = new_list();
@@ -82,16 +89,18 @@ ExtDef: Specifier ExtDecList SEMI {
         ptr1 = ptr1->next;
         ptr2 = ptr2->next;
         ptr3 = ptr3->next;
+        print_shape(ptr3->value);
         if (insert_arg(table, fun_name, find_struct_by_name(struct_table, ptr1->value), ptr2->value, ptr3->value) == 0) {
             report_error("Argument redeclaration", @1.first_line, "3");
         }
         else {
-            insert_var(table, ptr2->value, find_struct_by_name(struct_table, ptr1->value), ptr3->value);
+            if (has_tag(struct_table, ptr2->value) || has_item(table, ptr2->value)) report_error("Variable name \"%s\" already used", @1.first_line, "3", ptr2->value);
+            else insert_var(table, ptr2->value, find_struct_by_name(struct_table, ptr1->value), ptr3->value);
         }
     }
     type_list = new_list();
     name_list = new_list();
-}
+} CompSt { }
 | Specifier error SEMI { report_error("ExtDef error; Sync with SEMI", @3.first_line, "B"); }
 | Specifier error { report_error("ExtDef error; Missing ';'?", @2.first_line, "B"); };
 
@@ -144,7 +153,6 @@ ParamDec: Specifier VarDec {
     if (shapes == NULL) shapes = new_list();
     add_node(type_list, arg_type);
 };
-
 CompSt: LC DefList StmtList RC { }
 | error RC { report_error("CompSt error; Sync with RC", @2.first_line, "B"); };
 
@@ -154,7 +162,7 @@ StmtList: {  }
 Stmt: Exp SEMI {  }
 | CompSt {  }
 | RETURN Exp SEMI {
-    if (struct_ptr != $2.type) report_error("Return type differs from function definition", @1.first_line, "8");
+    if (struct_ptr != $2.type || $2.dim != 0) report_error("Return type differs from function definition", @1.first_line, "8");
 }
 | IF LP Exp RP Stmt %prec LOWER_THAN_ELSE {  }
 | IF LP Exp RP Stmt ELSE Stmt { }
@@ -182,7 +190,10 @@ Def: Specifier DecList SEMI {
                 report_error("Redeclaration field", @1.first_line, "15");
             }
         }
-        else insert_var(table, ptr->value, find_struct_by_name(struct_table, type), ptr2->value);
+        else {
+            if (has_tag(struct_table, ptr->value) || has_item(table, ptr->value)) report_error("Variable name \"%s\" already used", @1.first_line, "3", ptr->value);
+            else insert_var(table, ptr->value, find_struct_by_name(struct_table, type), ptr2->value);
+        }
     }
     name_list = new_list();
     shapes = new_list();
@@ -206,46 +217,46 @@ Exp: Exp ASSIGNOP Exp {
     // assign between dim 0 is allowed.
     else if ($1.type != $3.type || $1.dim != $3.dim || $1.dim > 0) report_error("Assign expression mismatch", @1.first_line, "5");
     else {
-        $$.type = INT_TYPE;
+        $$.type = $3.type;
         $$.dim = 0;
     }
     $$.assignable = 0;
 }
 | Exp AND Exp {
-    if ($1.type != $3.type) { report_error("Expression type mismatch: +", @1.first_line, "5"); }
+    if ($1.type != $3.type) { report_error("Operation type mismatch: &&", @1.first_line, "7"); }
     else if (!($1.type <= FLOAT && $1.dim == $3.dim && $1.dim == 0)) {
         report_error("Operation type mismatch", @1.first_line, "7");
     }
     else {
-        $$.type = $1.type;
+        $$.type = INT_TYPE;
         $$.dim = $1.dim;
     }
     $$.assignable = 0;
 }
 | Exp OR Exp {
-    if ($1.type != $3.type) { report_error("Expression type mismatch: +", @1.first_line, "5"); }
+    if ($1.type != $3.type) { report_error("Operation type mismatch: ||", @1.first_line, "7"); }
     else if (!($1.type <= FLOAT && $1.dim == $3.dim && $1.dim == 0)) {
         report_error("Operation type mismatch", @1.first_line, "7");
     }
     else {
-        $$.type = $1.type;
+        $$.type = INT_TYPE;
         $$.dim = $1.dim;
     }
     $$.assignable = 0;
 }
 | Exp RELOP Exp {
-    if ($1.type != $3.type) { report_error("Expression type mismatch: +", @1.first_line, "5"); }
+    if ($1.type != $3.type) { report_error("Operation type mismatch: %s", @1.first_line, "7", $2); }
     else if (!($1.type <= FLOAT && $1.dim == $3.dim && $1.dim == 0)) {
         report_error("Operation type mismatch", @1.first_line, "7");
     }
     else {
-        $$.type = $1.type;
+        $$.type = INT_TYPE;
         $$.dim = $1.dim;
     }
     $$.assignable = 0;
 }
 | Exp PLUS Exp {
-    if ($1.type != $3.type) { report_error("Expression type mismatch: +", @1.first_line, "5"); }
+    if ($1.type != $3.type) { report_error("Operation type mismatch: +", @1.first_line, "7", $1.type, $3.type); }
     else if (!($1.type <= FLOAT && $1.dim == $3.dim && $1.dim == 0)) {
         report_error("Operation type mismatch", @1.first_line, "7");
     }
@@ -256,7 +267,7 @@ Exp: Exp ASSIGNOP Exp {
     $$.assignable = 0;
 }
 | Exp MINUS Exp {
-    if ($1.type != $3.type) { report_error("Expression type mismatch: -", @1.first_line, "5"); }
+    if ($1.type != $3.type) { report_error("Operation type mismatch: -", @1.first_line, "7"); }
     else if (!($1.type <= FLOAT && $1.dim == $3.dim && $1.dim == 0)) {
         report_error("Operation type mismatch", @1.first_line, "7");
     }
@@ -267,7 +278,7 @@ Exp: Exp ASSIGNOP Exp {
     $$.assignable = 0;
 }
 | Exp STAR Exp {
-    if ($1.type != $3.type) { report_error("Expression type mismatch: *", @1.first_line, "5"); }
+    if ($1.type != $3.type) { report_error("Operation type mismatch: *", @1.first_line, "7"); }
     else if (!($1.type <= FLOAT && $1.dim == $3.dim && $1.dim == 0)) {
         report_error("Operation type mismatch", @1.first_line, "7");
     }
@@ -278,7 +289,7 @@ Exp: Exp ASSIGNOP Exp {
     $$.assignable = 0;
 }
 | Exp DIV Exp {
-    if ($1.type != $3.type) { report_error("Expression type mismatch: /", @1.first_line, "5"); }
+    if ($1.type != $3.type) { report_error("Operation type mismatch: /", @1.first_line, "7"); }
     else if (!($1.type <= FLOAT && $1.dim == $3.dim && $1.dim == 0)) {
         report_error("Operation type mismatch", @1.first_line, "7");
     }
@@ -309,7 +320,7 @@ Exp: Exp ASSIGNOP Exp {
     }
     $$.assignable = 0;
 }
-| ID LP {arg_mismatched = 0; fun_calling = get_item_by_name(table, $1); matching_arg = fun_calling->data.fun_info->head->next; } Args RP {
+| ID LP { if (has_item(table, $1) == 0) {report_error("Function \"%s\" undeclared", @1.first_line, "2", $1); matching_arg = NULL;} else { arg_mismatched = 0; fun_calling = get_item_by_name(table, $1); matching_arg = fun_calling->data.fun_info->head->next;}} Args RP {
     if (has_item(table, $1) == 0) report_error("Function undeclared", @1.first_line, "2");
     else if (get_item_by_name(table, $1)->type != FUN) report_error("Calling a non-function identifier", @1.first_line, "11");
     else if (matching_arg != NULL) report_error("Argument number mismatch", @1.first_line, "9");
@@ -319,10 +330,10 @@ Exp: Exp ASSIGNOP Exp {
     }
     $$.assignable = 0;
 }
-| ID LP {arg_mismatched = 0; fun_calling = get_item_by_name(table, $1); matching_arg = NULL;} RP {
+| ID LP { if (has_item(table, $1) == 0) {report_error("Function \"%s\" undeclared", @1.first_line, "2", $1); matching_arg = NULL;} else { arg_mismatched = 0; fun_calling = get_item_by_name(table, $1); matching_arg = NULL;}} RP {
     if (has_item(table, $1) == 0) report_error("Function undeclared", @1.first_line, "2");
     else if (get_item_by_name(table, $1)->type != FUN) report_error("Calling a non-function identifier", @1.first_line, "11");
-    else if (matching_arg != NULL) report_error("Argument number mismatch", @1.first_line, "9");
+    else if (fun_calling->data.fun_info->head->value) report_error("Argument number mismatch", @1.first_line, "9");
     else {
         
         $$.type = fun_calling->data.fun_info->ret_vtype;
@@ -338,25 +349,30 @@ Exp: Exp ASSIGNOP Exp {
     $$.assignable = $1.assignable;
 }
 | Exp DOT ID {
-    if ($1.type < NO_SUCH_STRUCT || $1.dim != 0) report_error("Using DOT operator to a non-struct", @1.first_line, "13");
+    if (($1.dim != 0) || ($1.type < NO_SUCH_STRUCT)) { report_error("Using DOT operator to a non-struct", @1.first_line, "13");}
     else if (!has_field($1.type, $3)) report_error("Undeclared struct field", @1.first_line, "14");
     else {
     	struct field_info *field = get_field_by_name(struct_ptr, $3);
-    	$$.type = field->type;
-    	$$.dim = field->shape->value;
-    	$$.assignable = 1;
+    	if (field == NULL) { printf("!!\n"); $$.type = INT_TYPE; /* set to INT_TYPE */ $$.dim = 0; $$.assignable = 0;}
+    	else {
+    	    $$.type = field->type;
+    	    $$.dim = field->shape->value;
+    	    $$.assignable = 1;
+    	}
     }
 }
 | ID { 
-    if (has_item(table, $1) == 0) report_error("Variable undeclared", @1.first_line, "1");
-    struct table_item *item = get_item_by_name(table, $1);
-    if (item->type != VAR) {
-        $$.type = NOT_A_VAR;
-        $$.dim = 0;
-    }
+    if (has_item(table, $1) == 0) { report_error("Variable \"%s\" undeclared", @1.first_line, "1", $1);  $$.type = INT_TYPE; }
     else {
-        $$.type = item->data.var_info.vtype;
-        $$.dim = item->data.var_info.shape->value;
+        struct table_item *item = get_item_by_name(table, $1);
+        if (item->type != VAR) {
+            $$.type = NOT_A_VAR;
+            $$.dim = 0;
+        }
+        else {
+            $$.type = item->data.var_info.vtype;
+            $$.dim = item->data.var_info.shape->value;
+        }
     }
     $$.assignable = 1;
 }

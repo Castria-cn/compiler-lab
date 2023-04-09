@@ -1,0 +1,12 @@
+int point;
+struct point {
+    int x;
+    int y;
+};
+
+struct complex {
+    int real;
+    int imagine;
+};
+
+struct complex {};

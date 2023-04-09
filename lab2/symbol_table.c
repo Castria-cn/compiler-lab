@@ -28,7 +28,7 @@ int has_item(struct listnode *T, char *s) {
 
 int insert_var(struct listnode *T, char *s, struct struct_info *type, struct listnode *shape) {
 	if (has_item(T, s)) {
-		printf("symbol %s already exists!\n", s);
+		// printf("symbol %s already exists!\n", s);
 		return 0;
 	}
 	struct table_item *t = malloc(sizeof(struct table_item));
@@ -43,7 +43,7 @@ int insert_var(struct listnode *T, char *s, struct struct_info *type, struct lis
 
 int insert_fun(struct listnode *T, char *s, struct struct_info *type) {
 	if (has_item(T, s)) {
-		printf("symbol %s already exists!\n", s);
+		// printf("symbol %s already exists!\n", s);
 		return 0;
 	}
 	struct table_item *t = malloc(sizeof(struct table_item));
@@ -60,7 +60,7 @@ int insert_fun(struct listnode *T, char *s, struct struct_info *type) {
 
 int insert_arg(struct listnode *T, char *fun_name, struct struct_info *type, char *arg_name, struct listnode *shape) {
 	if (!has_item(T, fun_name)) {
-		printf("function name does not exist!\n");
+		// printf("function name does not exist!\n");
 		return 0;
 	}
 	struct listnode *ptr = T;
@@ -72,7 +72,7 @@ int insert_arg(struct listnode *T, char *fun_name, struct struct_info *type, cha
 			while (arg_ptr->next != NULL) {
 				arg_ptr = arg_ptr->next;
 				if (strcmp(((struct arg_info*)(arg_ptr->value))->arg_name, arg_name) == 0) {
-					printf("function %s already has an arg named %s!\n", fun_name, arg_name);
+					// printf("function %s already has an arg named %s!\n", fun_name, arg_name);
 					return 0;
 				}
 			}
@@ -95,7 +95,7 @@ struct struct_info *insert_struct(struct listnode *T, char *opt_name) {
 			ptr = ptr->next;
 			// printf("structs: %s\n", ((struct struct_info*)(ptr->value))->opt_tag);
 			if (strcmp(((struct struct_info*)(ptr->value))->opt_tag, opt_name) == 0) {
-				printf("struct tag %s already exists!\n", opt_name);
+				// printf("struct tag %s already exists!\n", opt_name);
 				return NULL;
 			}
 		}
@@ -112,7 +112,7 @@ int insert_field(struct struct_info *struct_info, char *field_name, struct struc
 	while (ptr->next != NULL) {
 		ptr = ptr->next;
 		if (strcmp(((struct field_info*)(ptr->value))->field_name, field_name) == 0) {
-			printf("struct field name exists!\n");
+			// printf("struct field name exists!\n");
 			return 0;
 		}
 	} 
@@ -181,6 +181,15 @@ struct field_info *get_field_by_name(struct struct_info *struct_info, char *s) {
         }
     }
     return ret;
+}
+
+int has_tag(struct listnode *struct_table, char *s) {
+    struct listnode *ptr = struct_table;
+    while (ptr->next != NULL) {
+        ptr = ptr->next;
+        if (strcmp(((struct struct_info*)(ptr->value))->opt_tag, s) == 0) return 1;
+    }
+    return 0;
 }
 void print_vinfo(struct struct_info *f) {
 	switch((unsigned long long)f) {

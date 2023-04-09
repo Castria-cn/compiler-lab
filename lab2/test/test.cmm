@@ -1,8 +1,0 @@
-struct {
-    int x;
-    int y;
-} p, q[10];
-int main()
-{
-    int ass;
-}

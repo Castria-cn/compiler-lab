@@ -1,0 +1,10 @@
+struct point {
+    int x;
+    int y;
+} p, q[30];
+
+int main() {
+    p.x;
+    p.y;
+    q[0].field;
+}

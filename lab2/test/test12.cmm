@@ -1,0 +1,10 @@
+int main() {
+    int a[30];
+    float x, y, z;
+    int m, n;
+    a[1 == 1];
+    a[ ((x + y) / z) == 0.0];
+    a[x * y - z];
+    a[x = y];
+    a[m = n];
+}
