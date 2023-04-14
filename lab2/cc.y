@@ -4,9 +4,9 @@
 #include "cc.h"
 #include "symbol_table.h"
 
-int in_struct = 0, arg_mismatched = 0, using_struct = 0;
+int in_struct = 0, arg_mismatched = 0, using_struct = 0, dec_fun = 1, bad_struct = 0;
 char *arg_name, *arg_type, *fun_name, *type;
-struct struct_info *struct_ptr;
+struct struct_info *struct_ptr, *ret_type;
 struct table_item *fun_calling;
 struct listnode *name_list, *type_list, *shape_list, *shapes, *matching_arg;
 %}
@@ -77,10 +77,11 @@ ExtDef: Specifier ExtDecList SEMI {
     }
     using_struct = 0;
     name_list = new_list();
+    bad_struct = 0;
 }
-| Specifier SEMI {}
+| Specifier SEMI { bad_struct = 0; }
 | Specifier FunDec { 
-    if (insert_fun(table, fun_name, struct_ptr) == 0) {
+    if (insert_fun(table, fun_name, ret_type) == 0) {
         report_error("Function redeclaration", @1.first_line, "4");
     }
     if (type_list == NULL) type_list = new_list();
@@ -101,21 +102,23 @@ ExtDef: Specifier ExtDecList SEMI {
     type_list = new_list();
     name_list = new_list();
     shapes = new_list();
-} CompSt { }
+} CompSt { dec_fun = 1; }
 | Specifier error SEMI { report_error("ExtDef error; Sync with SEMI", @3.first_line, "B"); }
 | Specifier error { report_error("ExtDef error; Missing ';'?", @2.first_line, "B"); };
 
 ExtDecList: VarDec { add_node(shapes, shape_list); shape_list = new_list(); }
 | VarDec { add_node(shapes, shape_list); shape_list = new_list(); } COMMA ExtDecList {  };
 
-Specifier: TYPE { type = malloc(strlen($1)); strcpy(type, $1); }
+Specifier: TYPE { type = malloc(strlen($1)); strcpy(type, $1); if (dec_fun) {ret_type = find_struct_by_name(struct_table, $1); } }
 | StructSpecifier { using_struct = 1; };
 
 StructSpecifier: STRUCT OptTag { 
     in_struct = 1;
     if ((struct_ptr = insert_struct(struct_table, $2)) == NULL || has_item(table, $2)) {
         report_error("Redeclaration struct tag", @1.first_line, "16");
+        bad_struct = 1;
     }
+    else if (dec_fun) ret_type = struct_ptr;
 } LC DefList RC {
     in_struct = 0;
     name_list = new_list();
@@ -137,8 +140,8 @@ VarDec: ID {
 | VarDec LB INT RB { if (shape_list == NULL) shape_list = new_list(); int *shape = malloc(sizeof(int)); *shape = $3; add_node(shape_list, shape); }
 | error RB { report_error("VarDec error; Sync with RB", @2.first_line, "B"); };
 
-FunDec: ID LP VarList RP { fun_name = malloc(strlen($1)); strcpy(fun_name, $1); }
-| ID LP RP { fun_name = malloc(strlen($1)); strcpy(fun_name, $1); }
+FunDec: ID LP { dec_fun = 0; } VarList RP { fun_name = malloc(strlen($1)); strcpy(fun_name, $1); }
+| ID LP {dec_fun = 0; }RP { fun_name = malloc(strlen($1)); strcpy(fun_name, $1); }
 | error RP { report_error("FunDec error; Sync with RP", @2.first_line, "B"); };
 
 VarList: ParamDec { add_node(shapes, shape_list); shape_list = new_list(); } COMMA VarList {  }
@@ -163,7 +166,7 @@ StmtList: {  }
 Stmt: Exp SEMI {  }
 | CompSt {  }
 | RETURN Exp SEMI {
-    if (struct_ptr != $2.type || $2.dim != 0) report_error("Return type differs from function definition", @1.first_line, "8");
+    if (ret_type != $2.type || $2.dim != 0) report_error("Return type differs from function definition", @1.first_line, "8");
 }
 | IF LP Exp RP Stmt %prec LOWER_THAN_ELSE {  }
 | IF LP Exp RP Stmt ELSE Stmt { }
@@ -178,6 +181,7 @@ DefList: {  }
 };
 
 Def: Specifier DecList SEMI {
+    if (!bad_struct) {
     struct listnode *ptr = name_list, *ptr2 = shapes;
     while (ptr->next != NULL) {
         ptr = ptr->next;
@@ -197,6 +201,7 @@ Def: Specifier DecList SEMI {
                 insert_var(table, ptr->value, find_struct_by_name(struct_table, type), ptr2->value);
             }
         }
+    }
     }
     name_list = new_list();
     shapes = new_list();
@@ -323,7 +328,7 @@ Exp: Exp ASSIGNOP Exp {
     }
     $$.assignable = 0;
 }
-| ID LP { if (has_item(table, $1) == 0) {report_error("Function \"%s\" undeclared", @1.first_line, "2", $1); matching_arg = NULL;} else { arg_mismatched = 0; fun_calling = get_item_by_name(table, $1); matching_arg = fun_calling->data.fun_info->head->next; }} Args RP {
+| ID LP { if (has_item(table, $1) == 0) {report_error("Function \"%s\" undeclared", @1.first_line, "2", $1); matching_arg = NULL;} else { arg_mismatched = 0; fun_calling = get_item_by_name(table, $1); if (fun_calling->type == FUN) matching_arg = fun_calling->data.fun_info->head->next; else report_error("Calling a non-function identifier", @1.first_line, "11");}} Args RP {
     if (has_item(table, $1) == 0) report_error("Function undeclared", @1.first_line, "2");
     else if (get_item_by_name(table, $1)->type != FUN) report_error("Calling a non-function identifier", @1.first_line, "11");
     else if (matching_arg != NULL) report_error("Argument number mismatch", @1.first_line, "9");
@@ -333,7 +338,7 @@ Exp: Exp ASSIGNOP Exp {
     }
     $$.assignable = 0;
 }
-| ID LP { if (has_item(table, $1) == 0) {report_error("Function \"%s\" undeclared", @1.first_line, "2", $1); matching_arg = NULL;} else { arg_mismatched = 0; fun_calling = get_item_by_name(table, $1); matching_arg = NULL;}} RP {
+| ID LP { if (has_item(table, $1) == 0) {report_error("Function \"%s\" undeclared", @1.first_line, "2", $1); matching_arg = NULL;} else { arg_mismatched = 0; fun_calling = get_item_by_name(table, $1); if (fun_calling->type != FUN) report_error("Calling a non-function identifier", @1.first_line, "11"); matching_arg = NULL;}} RP {
     if (has_item(table, $1) == 0) report_error("Function undeclared", @1.first_line, "2");
     else if (get_item_by_name(table, $1)->type != FUN) report_error("Calling a non-function identifier", @1.first_line, "11");
     else if (fun_calling->data.fun_info->head->value) report_error("Argument number mismatch", @1.first_line, "9");
