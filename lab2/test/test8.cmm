@@ -1,15 +1,5 @@
-struct point {
-    int x;
-    int y;
-};
-
-struct point add(struct point A, struct point B) {
-    struct point C_correct;
-    struct point arr[10];
-    C_correct.x = A.x + B.x;
-    C_correct.y = A.y + B.y;
-    return C_correct;
-    return 1;
-    return 1.0;
-    return arr;
+int main()
+{
+    float j = 1.7;
+    return j;
 }

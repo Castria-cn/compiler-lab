@@ -1,5 +1,8 @@
 struct point {
-    int x;
-    int y;
+    float x, y;
     int x;
 };
+
+int main()
+{
+}

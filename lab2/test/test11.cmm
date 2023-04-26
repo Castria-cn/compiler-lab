@@ -1,5 +1,4 @@
 int main() {
-    int a[30], b;
-    a();
-    b();
+    int i;
+    i(10);
 }

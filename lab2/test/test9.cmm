@@ -1,18 +1,9 @@
-struct point {
-    int x;
-    int y;
-};
+int func(int i)
+{
+    return i;
+}
 
-int f(int a[3], int b, int d[4][4], struct point m, struct point n[10]) {}
-
-int main() {
-    int p[10], q[20][20];
-    float z[20][20];
-    struct point e, g[30];
-    
-    f(p, 2, q, e, g); // correct
-    f(p, 2, q, e, g[0]);
-    f(p, 2, z);
-    f(2, 2, 2);
-    f();
+int main()
+{
+    func(1, 2);
 }

@@ -1,13 +1,4 @@
-struct point {
-    int x;
-    int y;
-};
 int main() {
-    int a[30], b;
-    struct point p[30];
-    p[0] + a;
-    b + a;
-    p + p;
-    p[0] + p[1];
-    a[0] + b;
+    float j;
+    10 + j;
 }

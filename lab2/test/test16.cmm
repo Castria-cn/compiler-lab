@@ -1,12 +1,13 @@
-int point;
-struct point {
-    int x;
+struct Position
+{
+    float x;
+};
+
+struct Position
+{
     int y;
 };
 
-struct complex {
-    int real;
-    int imagine;
-};
-
-struct complex {};
+int main()
+{
+}

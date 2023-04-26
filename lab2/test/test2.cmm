@@ -1,5 +1,5 @@
 int main()
 {
-    int x;
-    x = f(3, 4);
+    int i = 0;
+    inc(i);
 }

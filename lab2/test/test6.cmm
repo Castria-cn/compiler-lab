@@ -1,5 +1,4 @@
 int main() {
-    int a, b;
-    (a + b) = 3;
-    3 = a;
+    int i;
+    10 = i;
 }

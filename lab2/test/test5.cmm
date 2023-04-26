@@ -1,5 +1,4 @@
 int main() {
-    int x;
-    float y;
-    x = y;
+    int i;
+    i = 3.7;
 }
